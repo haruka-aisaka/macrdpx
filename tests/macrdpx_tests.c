@@ -180,6 +180,8 @@ static void test_keys(void) {
     CHECK(mrx_keycode_for_hid_usage(0x90) == 104);  /* Kana */
     CHECK(mrx_keycode_for_hid_usage(0x91) == 102);  /* Eisu */
     CHECK(mrx_keycode_for_hid_usage(0x89) == 93);   /* Yen */
+    CHECK(mrx_keycode_for_hid_usage(0x8B) == 102);  /* 無変換 -> Eisu */
+    CHECK(mrx_keycode_for_hid_usage(0x8A) == 104);  /* 変換 -> Kana */
     CHECK(mrx_keycode_for_hid_usage(0xE3) == 55);   /* left Command */
     CHECK(mrx_keycode_for_hid_usage(0xE7) == 54);   /* right Command */
     CHECK(mrx_keycode_for_hid_usage(0x00) == MRX_KEYCODE_NONE);

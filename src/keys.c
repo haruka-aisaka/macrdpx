@@ -52,6 +52,10 @@ uint16_t mrx_keycode_for_hid_usage(uint16_t usage) {
     if (usage == 0) return MRX_KEYCODE_NONE;
     /* Some usages have two Mac keys; prefer the main block's. */
     if (usage == 0x32) return 42; /* Non-US # is the backslash position on ISO. */
+    /* A PC JIS keyboard's 無変換/変換 (International5/4) sit where a Mac's
+     * 英数/かな do, and mean the same to an input method. */
+    if (usage == 0x8B) return 102;
+    if (usage == 0x8A) return 104;
     for (uint16_t kc = 0; kc <= MRX_MAX_KEYCODE; kc++)
         if (kUsageForKeycode[kc] == usage) return kc;
     return MRX_KEYCODE_NONE;
