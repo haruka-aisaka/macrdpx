@@ -208,10 +208,40 @@ static void test_keys(void) {
     CHECK(mrx_modifier_tracker_update(&t, 0, MRX_KEY_DOWN) == 0);
 }
 
+static void test_gesture(void) {
+    uint8_t buf[64];
+    mrx_message in = {.type = MRX_MSG_GESTURE}, out;
+    in.u.gesture.kind = MRX_GESTURE_DOCK_VERTICAL;
+    in.u.gesture.phase = MRX_PHASE_ENDED;
+    in.u.gesture.value = 0.75f;
+    in.u.gesture.velocity = -2.5f;
+    in.u.gesture.modifier_flags = MRX_FLAG_OPTION | (1ull << 40);
+    roundtrip(&in, &out, buf, sizeof buf);
+    CHECK(out.u.gesture.kind == MRX_GESTURE_DOCK_VERTICAL);
+    CHECK(out.u.gesture.phase == MRX_PHASE_ENDED);
+    CHECK(out.u.gesture.value == 0.75f && out.u.gesture.velocity == -2.5f);
+    CHECK(out.u.gesture.modifier_flags == MRX_FLAG_OPTION);
+
+    size_t written, consumed;
+    in.u.gesture.kind = MRX_GESTURE_MAX + 1;
+    CHECK(mrx_encode(&in, buf, sizeof buf, &written) == MRX_ERROR_INVALID_ARGUMENT);
+    in.u.gesture.kind = MRX_GESTURE_MAGNIFY;
+    in.u.gesture.value = NAN;
+    CHECK(mrx_encode(&in, buf, sizeof buf, &written) == MRX_ERROR_INVALID_ARGUMENT);
+
+    /* An unknown kind from a later version is malformed, not misread. */
+    in.u.gesture.value = 0.1f;
+    CHECK(mrx_encode(&in, buf, sizeof buf, &written) == MRX_OK);
+    buf[MRX_HEADER_BYTES] = 200;
+    CHECK(mrx_decode(buf, written, &out, &consumed) == MRX_ERROR_MALFORMED);
+    CHECK(strcmp(mrx_message_type_name(MRX_MSG_GESTURE), "gesture") == 0);
+}
+
 int main(void) {
     test_hello();
     test_key_and_flags();
     test_pointer_and_scroll();
+    test_gesture();
     test_stream_and_input_source();
     test_stream_framing();
     test_negotiate();

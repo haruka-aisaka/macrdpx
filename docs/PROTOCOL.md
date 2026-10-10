@@ -48,6 +48,7 @@ so the server never sees a key twice.
 | 3 | `STREAM_CONFIG` | Client sets frame rate / bit rate; server reports status. |
 | 4 | `INPUT_SOURCE` | Server reports its selected keyboard input source. |
 | 5 | `CURSOR_ALPHA` | Client draws 32-bpp alpha colour pointers; real cursor shapes may be sent. |
+| 6 | `GESTURES` | Trackpad gestures beyond scrolling (pinch, rotate, smart zoom, Dock swipes). |
 
 ## Messages
 
@@ -125,6 +126,33 @@ A move with buttons held is posted as a drag of the lowest held button.
 Phases follow AppKit: a gesture is `MAY_BEGIN`? → `BEGAN` → `CHANGED`* →
 `ENDED`/`CANCELLED`, then optionally momentum events with phase 0 and momentum
 `BEGAN` → `CHANGED`* → `ENDED`. Deltas are in points of the server's screen.
+
+### 0x0022 GESTURE (client to server)
+
+| Off | Size | Field |
+|---|---|---|
+| 0 | u8 | kind (below) |
+| 1 | u8 | phase (`NSEvent.Phase` bits) |
+| 2 | u16 | reserved, 0 |
+| 4 | f32 | value |
+| 8 | f32 | velocity (Dock swipes, ending event only) |
+| 12 | u64 | mods |
+
+| Kind | Gesture | value |
+|---|---|---|
+| 0 | magnify (pinch) | magnification since the previous event, as `NSEvent.magnification` |
+| 1 | rotate | degrees since the previous event, counter-clockwise positive |
+| 2 | smart zoom (two-finger double tap) | unused; no phase |
+| 3 | Dock swipe, horizontal (Spaces) | progress in screen widths, positive as the fingers move left |
+| 4 | Dock swipe, vertical (Mission Control / App Exposé) | progress in screen heights, positive as the fingers move up |
+
+A gesture is `BEGAN` → `CHANGED`* → `ENDED`/`CANCELLED`, posted at the
+pointer. A Dock swipe's progress is the total so far, not a delta: the
+screen follows it, and on `ENDED` the server completes the swipe or springs
+back, as macOS decides from progress and velocity (progress per second).
+Swipes that should just happen - a Space to the right, Mission Control -
+can instead be sent as the keys that do it (KEY), which needs no `GESTURES`.
+Kinds above 4 are malformed in version 1.
 
 ### 0x0030 STREAM_CONFIG (client to server)
 

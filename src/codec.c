@@ -58,6 +58,7 @@ enum {
     MODIFIERS_BYTES = 8,
     POINTER_BYTES = 24,
     SCROLL_BYTES = 20,
+    GESTURE_BYTES = 20,
     STREAM_CONFIG_BYTES = 8,
     STREAM_STATUS_BYTES = 16,
     INPUT_SOURCE_BYTES = 2
@@ -87,6 +88,10 @@ static mrx_status validate(const mrx_message *m) {
         if (m->u.scroll.unit > MRX_SCROLL_LINE) return MRX_ERROR_MALFORMED;
         if (!coord_ok(m->u.scroll.delta_x) || !coord_ok(m->u.scroll.delta_y)) return MRX_ERROR_MALFORMED;
         return MRX_OK;
+    case MRX_MSG_GESTURE:
+        if (m->u.gesture.kind > MRX_GESTURE_MAX) return MRX_ERROR_MALFORMED;
+        if (!isfinite(m->u.gesture.value) || !isfinite(m->u.gesture.velocity)) return MRX_ERROR_MALFORMED;
+        return MRX_OK;
     case MRX_MSG_INPUT_SOURCE:
         if (m->u.input_source.id_length && !m->u.input_source.id) return MRX_ERROR_INVALID_ARGUMENT;
         return MRX_OK;
@@ -103,6 +108,7 @@ static size_t payload_size(const mrx_message *m) {
     case MRX_MSG_MODIFIERS: return MODIFIERS_BYTES;
     case MRX_MSG_POINTER: return POINTER_BYTES;
     case MRX_MSG_SCROLL: return SCROLL_BYTES;
+    case MRX_MSG_GESTURE: return GESTURE_BYTES;
     case MRX_MSG_STREAM_CONFIG: return STREAM_CONFIG_BYTES;
     case MRX_MSG_STREAM_STATUS: return STREAM_STATUS_BYTES;
     case MRX_MSG_INPUT_SOURCE: return INPUT_SOURCE_BYTES + m->u.input_source.id_length;
@@ -168,6 +174,15 @@ mrx_status mrx_encode(const mrx_message *m, uint8_t *buf, size_t capacity, size_
         p[11] = m->u.scroll.flags & MRX_SCROLL_FLAG_INVERTED_FROM_DEVICE;
         put_u64(p + 12, m->u.scroll.modifier_flags & MRX_FLAG_MASK);
         break;
+    case MRX_MSG_GESTURE:
+        p[0] = m->u.gesture.kind;
+        p[1] = m->u.gesture.phase;
+        p[2] = 0;
+        p[3] = 0;
+        put_f32(p + 4, m->u.gesture.value);
+        put_f32(p + 8, m->u.gesture.velocity);
+        put_u64(p + 12, m->u.gesture.modifier_flags & MRX_FLAG_MASK);
+        break;
     case MRX_MSG_STREAM_CONFIG:
         put_u16(p, m->u.stream_config.max_fps);
         put_u32(p + 4, m->u.stream_config.bitrate_kbps);
@@ -220,6 +235,7 @@ mrx_status mrx_decode(const uint8_t *buf, size_t length, mrx_message *m, size_t 
     case MRX_MSG_MODIFIERS:
     case MRX_MSG_POINTER:
     case MRX_MSG_SCROLL:
+    case MRX_MSG_GESTURE:
     case MRX_MSG_STREAM_CONFIG:
     case MRX_MSG_STREAM_STATUS:
     case MRX_MSG_INPUT_SOURCE:
@@ -268,6 +284,17 @@ mrx_status mrx_decode(const uint8_t *buf, size_t length, mrx_message *m, size_t 
         m->u.scroll.momentum_phase = p[10];
         m->u.scroll.flags = p[11] & MRX_SCROLL_FLAG_INVERTED_FROM_DEVICE;
         m->u.scroll.modifier_flags = get_u64(p + 12) & MRX_FLAG_MASK;
+        break;
+    case MRX_MSG_GESTURE:
+        m->u.gesture.kind = p[0];
+        m->u.gesture.phase = p[1];
+        m->u.gesture.value = get_f32(p + 4);
+        m->u.gesture.velocity = get_f32(p + 8);
+        m->u.gesture.modifier_flags = get_u64(p + 12) & MRX_FLAG_MASK;
+        if (m->u.gesture.kind > MRX_GESTURE_MAX || !isfinite(m->u.gesture.value) ||
+            !isfinite(m->u.gesture.velocity)) {
+            return MRX_ERROR_MALFORMED;
+        }
         break;
     case MRX_MSG_STREAM_CONFIG:
         m->u.stream_config.max_fps = get_u16(p);
@@ -323,6 +350,7 @@ const char *mrx_message_type_name(mrx_message_type type) {
     case MRX_MSG_MODIFIERS: return "modifiers";
     case MRX_MSG_POINTER: return "pointer";
     case MRX_MSG_SCROLL: return "scroll";
+    case MRX_MSG_GESTURE: return "gesture";
     case MRX_MSG_STREAM_CONFIG: return "stream-config";
     case MRX_MSG_STREAM_STATUS: return "stream-status";
     case MRX_MSG_INPUT_SOURCE: return "input-source";

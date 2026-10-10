@@ -51,6 +51,7 @@ enum {
     MRX_MSG_MODIFIERS = 0x0012,
     MRX_MSG_POINTER = 0x0020,
     MRX_MSG_SCROLL = 0x0021,
+    MRX_MSG_GESTURE = 0x0022,
     MRX_MSG_STREAM_CONFIG = 0x0030,
     MRX_MSG_STREAM_STATUS = 0x0031,
     MRX_MSG_INPUT_SOURCE = 0x0040
@@ -76,7 +77,10 @@ enum {
     MRX_CAP_INPUT_SOURCE = 1u << 4,
     /* The client draws 32-bit colour pointers with alpha correctly, so the
      * server may send the real Mac cursor shapes. */
-    MRX_CAP_CURSOR_ALPHA = 1u << 5
+    MRX_CAP_CURSOR_ALPHA = 1u << 5,
+    /* Trackpad gestures beyond scrolling travel as themselves (GESTURE):
+     * pinch, rotate, smart zoom and the Dock's swipes. */
+    MRX_CAP_GESTURES = 1u << 6
 };
 
 typedef uint8_t mrx_role;
@@ -221,6 +225,37 @@ typedef struct mrx_scroll {
     uint64_t modifier_flags;
 } mrx_scroll;
 
+typedef uint8_t mrx_gesture_kind;
+enum {
+    /* value: magnification since the previous event (0.1 = 10 % larger),
+     * as NSEvent.magnification. */
+    MRX_GESTURE_MAGNIFY = 0,
+    /* value: degrees since the previous event, counter-clockwise positive,
+     * as NSEvent.rotation. */
+    MRX_GESTURE_ROTATE = 1,
+    /* Two-finger double tap. No phase, no value. */
+    MRX_GESTURE_SMART_ZOOM = 2,
+    /* The Dock's swipes as the fingers move, the screen following them:
+     * value is the progress so far in screen widths (heights), positive
+     * as the fingers move left (up), so +1 is the next Space to the right
+     * (Mission Control); velocity, on the ending event, in the same units per
+     * second, decides whether a short swipe still completes. */
+    MRX_GESTURE_DOCK_HORIZONTAL = 3,
+    MRX_GESTURE_DOCK_VERTICAL = 4
+};
+#define MRX_GESTURE_MAX MRX_GESTURE_DOCK_VERTICAL
+
+/* One trackpad gesture event. phase uses the NSEvent.Phase bits (BEGAN,
+ * CHANGED, ENDED, CANCELLED); a gesture is BEGAN, CHANGED*, then ENDED or
+ * CANCELLED. The server posts it at the pointer. */
+typedef struct mrx_gesture {
+    mrx_gesture_kind kind;
+    uint8_t phase;
+    float value;
+    float velocity;
+    uint64_t modifier_flags;
+} mrx_gesture;
+
 /* Client wishes for the video stream. Zero leaves the server's default. */
 typedef struct mrx_stream_config {
     uint16_t max_fps;
@@ -254,6 +289,7 @@ typedef struct mrx_message {
         mrx_modifiers modifiers;
         mrx_pointer pointer;
         mrx_scroll scroll;
+        mrx_gesture gesture;
         mrx_stream_config stream_config;
         mrx_stream_status stream_status;
         mrx_input_source input_source;
