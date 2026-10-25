@@ -60,6 +60,8 @@ enum {
     SCROLL_BYTES = 20,
     GESTURE_BYTES = 20,
     STREAM_CONFIG_BYTES = 8,
+    /* With the appended audio_compressed; the shorter one is still read. */
+    STREAM_CONFIG_V2_BYTES = 12,
     STREAM_STATUS_BYTES = 16,
     INPUT_SOURCE_BYTES = 2
 };
@@ -109,7 +111,7 @@ static size_t payload_size(const mrx_message *m) {
     case MRX_MSG_POINTER: return POINTER_BYTES;
     case MRX_MSG_SCROLL: return SCROLL_BYTES;
     case MRX_MSG_GESTURE: return GESTURE_BYTES;
-    case MRX_MSG_STREAM_CONFIG: return STREAM_CONFIG_BYTES;
+    case MRX_MSG_STREAM_CONFIG: return STREAM_CONFIG_V2_BYTES;
     case MRX_MSG_STREAM_STATUS: return STREAM_STATUS_BYTES;
     case MRX_MSG_INPUT_SOURCE: return INPUT_SOURCE_BYTES + m->u.input_source.id_length;
     default: return 0;
@@ -185,7 +187,13 @@ mrx_status mrx_encode(const mrx_message *m, uint8_t *buf, size_t capacity, size_
         break;
     case MRX_MSG_STREAM_CONFIG:
         put_u16(p, m->u.stream_config.max_fps);
+        p[2] = 0;
+        p[3] = 0;
         put_u32(p + 4, m->u.stream_config.bitrate_kbps);
+        p[8] = m->u.stream_config.audio_compressed ? 1 : 0;
+        p[9] = 0;
+        p[10] = 0;
+        p[11] = 0;
         break;
     case MRX_MSG_STREAM_STATUS:
         put_u16(p, m->u.stream_status.max_fps);
@@ -207,6 +215,8 @@ mrx_status mrx_encode(const mrx_message *m, uint8_t *buf, size_t capacity, size_
 }
 
 static size_t min_payload(mrx_message_type type) {
+    /* A sender from before audio_compressed writes 8 bytes. */
+    if (type == MRX_MSG_STREAM_CONFIG) return STREAM_CONFIG_BYTES;
     mrx_message probe;
     memset(&probe, 0, sizeof probe);
     probe.type = type;
@@ -299,6 +309,7 @@ mrx_status mrx_decode(const uint8_t *buf, size_t length, mrx_message *m, size_t 
     case MRX_MSG_STREAM_CONFIG:
         m->u.stream_config.max_fps = get_u16(p);
         m->u.stream_config.bitrate_kbps = get_u32(p + 4);
+        m->u.stream_config.audio_compressed = plen >= STREAM_CONFIG_V2_BYTES ? (uint8_t)(p[8] & 1) : 0;
         break;
     case MRX_MSG_STREAM_STATUS:
         m->u.stream_status.max_fps = get_u16(p);

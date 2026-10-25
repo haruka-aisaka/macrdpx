@@ -49,6 +49,7 @@ so the server never sees a key twice.
 | 4 | `INPUT_SOURCE` | Server reports its selected keyboard input source. |
 | 5 | `CURSOR_ALPHA` | Client draws 32-bpp alpha colour pointers; real cursor shapes may be sent. |
 | 6 | `GESTURES` | Trackpad gestures beyond scrolling (pinch, rotate, smart zoom, Dock swipes). |
+| 7 | `AUDIO_AAC` | The server sends its audio as AAC when STREAM_CONFIG asks for it (see below). |
 
 ## Messages
 
@@ -161,9 +162,18 @@ Kinds above 4 are malformed in version 1.
 | 0 | u16 | max frames per second, 0 = server default |
 | 2 | u16 | reserved |
 | 4 | u32 | target bit rate in kbit/s, 0 = server default |
+| 8 | u8 | audio_compressed: 1 asks for the audio as AAC (with `AUDIO_AAC`), 0 as it is |
+| 9 | 3 bytes | reserved |
 
 May be sent at any time (for example when the client's network changes).
-The server clamps to what it supports.
+The server clamps to what it supports. The last four bytes were appended;
+a payload of 8 bytes is read with `audio_compressed` 0.
+
+With `AUDIO_AAC`, the audio channel (`RDPSND`) offers one more format, tag
+`0x4D52`, private to this extension: AAC-LC, the format's channels and rate,
+each wave one or more ADTS frames, sent as Wave2 PDUs. A client lists it only
+if it can decode it; the server uses it only while `audio_compressed` is 1,
+and plain PCM otherwise.
 
 ### 0x0031 STREAM_STATUS (server to client)
 

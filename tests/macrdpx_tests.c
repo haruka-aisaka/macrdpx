@@ -109,6 +109,21 @@ static void test_stream_and_input_source(void) {
     c.u.stream_config.bitrate_kbps = 1500;
     roundtrip(&c, &out, buf, sizeof buf);
     CHECK(out.u.stream_config.max_fps == 30 && out.u.stream_config.bitrate_kbps == 1500);
+    CHECK(out.u.stream_config.audio_compressed == 0);
+    c.u.stream_config.audio_compressed = 1;
+    roundtrip(&c, &out, buf, sizeof buf);
+    CHECK(out.u.stream_config.audio_compressed == 1 && out.u.stream_config.max_fps == 30);
+
+    /* A STREAM_CONFIG from before audio_compressed: 8 bytes, read as 0. */
+    {
+        const uint8_t v1[] = {0x30, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00,
+                              0x0F, 0x00, 0x00, 0x00, 0xDC, 0x05, 0x00, 0x00};
+        mrx_message old;
+        size_t used = 0;
+        CHECK(mrx_decode(v1, sizeof v1, &old, &used) == MRX_OK && used == sizeof v1);
+        CHECK(old.u.stream_config.max_fps == 15 && old.u.stream_config.bitrate_kbps == 1500);
+        CHECK(old.u.stream_config.audio_compressed == 0);
+    }
 
     mrx_message i = {.type = MRX_MSG_INPUT_SOURCE};
     i.u.input_source.ascii_capable = 0;

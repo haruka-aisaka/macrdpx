@@ -80,7 +80,10 @@ enum {
     MRX_CAP_CURSOR_ALPHA = 1u << 5,
     /* Trackpad gestures beyond scrolling travel as themselves (GESTURE):
      * pinch, rotate, smart zoom and the Dock's swipes. */
-    MRX_CAP_GESTURES = 1u << 6
+    MRX_CAP_GESTURES = 1u << 6,
+    /* The server can send its audio compressed (AAC) on the client's word,
+     * STREAM_CONFIG's audio_compressed, to save data. */
+    MRX_CAP_AUDIO_AAC = 1u << 7
 };
 
 typedef uint8_t mrx_role;
@@ -256,10 +259,13 @@ typedef struct mrx_gesture {
     uint64_t modifier_flags;
 } mrx_gesture;
 
-/* Client wishes for the video stream. Zero leaves the server's default. */
+/* Client wishes for the stream. Zero leaves the server's default.
+ * audio_compressed (appended; with AUDIO_AAC) asks for the audio as AAC, to
+ * save data; a sender that predates it is read as 0. */
 typedef struct mrx_stream_config {
     uint16_t max_fps;
     uint32_t bitrate_kbps;
+    uint8_t audio_compressed;
 } mrx_stream_config;
 
 /* What the server applied, sent after STREAM_CONFIG and whenever the stream
